@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bulk Sender</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #eef2f1;
+    --surface: #ffffff;
+    --ink: #14211f;
+    --muted: #5d6e6a;
+    --line: #dbe3e1;
+    --field: #f7faf9;
+    --brand: #0e7c66;
+    --brand-hover: #0a6552;
+    --brand-soft: #dcf2ea;
+    --danger: #c2362b;
+    --danger-soft: #fbe6e3;
+    --warn-soft: #fdf1d8;
+    --warn: #8a5a00;
+    --wall: #e8e2d4;
+    --bubble: #d9fdd3;
+    --bubble-ink: #111b21;
+    --bubble-meta: #667781;
+    --log-bg: #0f1a18;
+    --log-ink: #c8d8d4;
+    --radius: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1413;
+      --surface: #162220;
+      --ink: #e6efed;
+      --muted: #95a8a4;
+      --line: #263634;
+      --field: #101a19;
+      --brand: #2bb596;
+      --brand-hover: #3fc7a8;
+      --brand-soft: #123a32;
+      --danger: #ff7d70;
+      --danger-soft: #3a1b18;
+      --warn-soft: #3a2e12;
+      --warn: #f0c46a;
+      --wall: #0b1514;
+      --bubble: #005c4b;
+      --bubble-ink: #e9edef;
+      --bubble-meta: #8fb3aa;
+      --log-bg: #0a1211;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Plus Jakarta Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  button, input, textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid color-mix(in srgb, var(--brand) 55%, transparent); outline-offset: 2px; }
+
+  /* ---------- Top bar ---------- */
+  .topbar { background: var(--surface); border-bottom: 1px solid var(--line); }
+  .topbar-inner { max-width: 1180px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: center; gap: 14px; }
+  .logo { width: 38px; height: 38px; border-radius: 11px; background: var(--brand); display: grid; place-items: center; flex: none; }
+  .brand-text h1 { margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.2; }
+  .brand-text p { margin: 0; font-size: 13px; color: var(--muted); }
+  .spacer { flex: 1; }
+  .status { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 10px; border-radius: 99px; background: var(--field); border: 1px solid var(--line); font-size: 13px; font-weight: 600; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #b3bfbc; }
+  .status.ready .dot { background: #22c55e; box-shadow: 0 0 0 4px color-mix(in srgb, #22c55e 22%, transparent); }
+  .status.wait .dot { background: #f0a92b; animation: pulse 1.4s ease-in-out infinite; }
+  .status.bad .dot { background: var(--danger); }
+  @keyframes pulse { 50% { opacity: .35; } }
+
+  /* ---------- Layout ---------- */
+  main { max-width: 1180px; margin: 0 auto; padding: 24px 24px 64px; }
+  .grid { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 24px; align-items: start; }
+  .side { position: sticky; top: 20px; display: grid; gap: 16px; }
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+  fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+  fieldset:disabled { opacity: .6; }
+
+  .section { padding: 22px 24px; }
+  .section + .section { border-top: 1px solid var(--line); }
+  .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+  .section-head h2 { margin: 0; font-size: 16px; font-weight: 700; }
+  .hint { font-size: 13px; color: var(--muted); }
+
+  textarea, input[type=number] {
+    width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--field); transition: border-color .15s, background .15s;
+  }
+  textarea:hover, input[type=number]:hover { border-color: color-mix(in srgb, var(--brand) 40%, var(--line)); }
+  textarea:focus, input[type=number]:focus { outline: none; border-color: var(--brand); background: var(--surface); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 20%, transparent); }
+  textarea { resize: vertical; min-height: 130px; line-height: 1.55; }
+  #numbers { min-height: 150px; font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+
+  /* ---------- Dropzone & files ---------- */
+  .drop {
+    display: flex; align-items: center; gap: 14px; padding: 16px; border: 1.5px dashed color-mix(in srgb, var(--brand) 45%, var(--line));
+    border-radius: 12px; background: var(--field); cursor: pointer; transition: background .15s, border-color .15s;
+  }
+  .drop:hover, .drop.over { background: var(--brand-soft); border-color: var(--brand); }
+  .drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  .drop:focus-within { outline: 3px solid color-mix(in srgb, var(--brand) 55%, transparent); outline-offset: 2px; }
+  .drop-icon { width: 42px; height: 42px; border-radius: 10px; background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; flex: none; }
+  .drop strong { display: block; font-weight: 600; }
+  .drop span { font-size: 13px; color: var(--muted); }
+
+  .files { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+  .file { display: flex; align-items: center; gap: 12px; padding: 9px 10px 9px 9px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+  .ext { width: 38px; height: 38px; border-radius: 8px; background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; font-size: 11px; font-weight: 800; flex: none; overflow: hidden; }
+  .ext img { width: 100%; height: 100%; object-fit: cover; }
+  .file-name { flex: 1; min-width: 0; }
+  .file-name b { display: block; font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-name small { color: var(--muted); font-size: 12px; }
+  .icon-btn { width: 32px; height: 32px; border-radius: 8px; border: 0; background: transparent; color: var(--muted); cursor: pointer; display: grid; place-items: center; }
+  .icon-btn:hover { background: var(--danger-soft); color: var(--danger); }
+
+  .check { display: flex; align-items: flex-start; gap: 10px; margin-top: 14px; cursor: pointer; }
+  .check input { width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--brand); flex: none; }
+  .check b { font-weight: 600; display: block; }
+  .check span { font-size: 13px; color: var(--muted); }
+
+  /* ---------- Recipients summary ---------- */
+  .tally { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .chip { padding: 3px 10px; border-radius: 99px; font-size: 13px; font-weight: 600; background: var(--brand-soft); color: var(--brand); }
+  .chip.warn { background: var(--warn-soft); color: var(--warn); }
+
+  /* ---------- Options ---------- */
+  details summary { cursor: pointer; font-size: 16px; font-weight: 700; list-style: none; display: flex; align-items: center; justify-content: space-between; }
+  details summary::-webkit-details-marker { display: none; }
+  details summary svg { transition: transform .2s; color: var(--muted); }
+  details[open] summary svg { transform: rotate(180deg); }
+  .opts { margin-top: 14px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .field label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 6px; }
+
+  /* ---------- Preview ---------- */
+  .preview-head { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+  .avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; font-weight: 800; font-size: 13px; }
+  .preview-head b { display: block; font-size: 14px; line-height: 1.2; }
+  .preview-head small { color: var(--muted); font-size: 12px; }
+  .wall { background: var(--wall); border-radius: 0 0 var(--radius) var(--radius); padding: 20px 16px 22px; min-height: 180px; display: flex; flex-direction: column; justify-content: flex-end; }
+  .bubble { align-self: flex-end; max-width: 92%; background: var(--bubble); color: var(--bubble-ink); border-radius: 10px 10px 2px 10px; padding: 4px; box-shadow: 0 1px 1px rgba(0,0,0,.12); font-size: 14.5px; }
+  .bubble .txt { padding: 4px 8px 2px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.4; }
+  .bubble .meta { display: flex; justify-content: flex-end; align-items: center; gap: 4px; font-size: 11px; color: var(--bubble-meta); padding: 0 8px 3px; }
+  .bubble img.shot { display: block; width: 100%; max-height: 260px; object-fit: cover; border-radius: 7px; }
+  .doc { display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,.07); border-radius: 7px; padding: 10px; }
+  .doc .ext { background: rgba(255,255,255,.55); color: #0a5c4b; }
+  .doc div { min-width: 0; }
+  .doc b { display: block; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  .doc small { font-size: 12px; opacity: .7; }
+  .more { font-size: 12px; padding: 4px 8px 0; opacity: .75; }
+  .placeholder { align-self: center; text-align: center; color: var(--muted); font-size: 13px; padding: 20px; }
+
+  /* ---------- Send panel ---------- */
+  .send-body { padding: 18px; }
+  .btn-row { display: flex; gap: 10px; }
+  .btn { border: 0; border-radius: 11px; padding: 13px 18px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 9px; transition: background .15s, transform .05s; }
+  .btn:active:not(:disabled) { transform: translateY(1px); }
+  .btn:disabled { cursor: not-allowed; opacity: .45; }
+  .btn.primary { flex: 1; background: var(--brand); color: #fff; font-size: 15.5px; }
+  .btn.primary:hover:not(:disabled) { background: var(--brand-hover); }
+  .btn.ghost { background: var(--danger-soft); color: var(--danger); }
+  .btn.ghost:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 22%, var(--danger-soft)); }
+  .eta { margin: 10px 2px 0; font-size: 13px; color: var(--muted); min-height: 20px; }
+
+  .progress { margin-top: 14px; }
+  .bar { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; }
+  .bar > div { height: 100%; width: 0; background: var(--brand); border-radius: 99px; transition: width .4s ease; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 14px; }
+  .stat { padding: 0 10px; border-left: 1px solid var(--line); }
+  .stat:first-child { padding-left: 0; border-left: 0; }
+  .stat b { display: block; font-size: 22px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .stat small { font-size: 12px; color: var(--muted); }
+  .stat.ok b { color: var(--brand); } .stat.fail b { color: var(--danger); }
+
+  .log-wrap { border-top: 1px solid var(--line); }
+  .log-title { display: flex; justify-content: space-between; padding: 12px 18px 0; font-size: 13px; font-weight: 700; }
+  #log { margin: 10px 14px 14px; background: var(--log-bg); color: var(--log-ink); border-radius: 10px; padding: 10px 12px; height: 200px; overflow: auto; font: 12px/1.65 ui-monospace, "Cascadia Code", Consolas, monospace; }
+  #log div { white-space: pre-wrap; overflow-wrap: anywhere; }
+  #log .ok { color: #5fe0a8; } #log .bad { color: #ff8f84; } #log .dim { color: #7f938e; }
+  #log .empty { color: #7f938e; }
+
+  /* ---------- Connection banner ---------- */
+  .banner { display: none; margin-bottom: 24px; padding: 22px 24px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface); }
+  .banner.show { display: block; }
+  .banner h2 { margin: 0 0 4px; font-size: 17px; }
+  .banner p { margin: 0; color: var(--muted); }
+  .banner.err { background: var(--danger-soft); border-color: color-mix(in srgb, var(--danger) 35%, transparent); }
+  .link-row { display: flex; gap: 28px; align-items: center; flex-wrap: wrap; }
+  .qr-box { background: #fff; padding: 10px; border-radius: 12px; border: 1px solid var(--line); line-height: 0; }
+  .qr-box img { width: 220px; height: 220px; }
+  .steps { margin: 12px 0 0; padding-left: 20px; color: var(--ink); }
+  .steps li { margin: 4px 0; }
+  .spin { display: inline-block; width: 16px; height: 16px; border: 2.5px solid var(--line); border-top-color: var(--brand); border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -3px; margin-right: 8px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---------- Dialog & toast ---------- */
+  dialog { border: 0; border-radius: 16px; padding: 0; width: min(440px, calc(100vw - 32px)); background: var(--surface); color: var(--ink); box-shadow: 0 24px 60px rgba(0,0,0,.28); }
+  dialog::backdrop { background: rgba(8, 18, 16, .55); }
+  .dlg { padding: 24px; }
+  .dlg h3 { margin: 0 0 6px; font-size: 19px; }
+  .dlg p { margin: 0 0 16px; color: var(--muted); }
+  .dlg dl { margin: 0 0 20px; display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; font-size: 14px; }
+  .dlg dt { color: var(--muted); } .dlg dd { margin: 0; font-weight: 600; text-align: right; }
+  .dlg .btn-row .btn { flex: 1; }
+  .btn.plain { background: var(--field); border: 1px solid var(--line); }
+  #toast { position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 20px); background: #1b2b28; color: #fff; padding: 12px 18px; border-radius: 10px; font-weight: 600; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 50; max-width: calc(100vw - 32px); }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+  #toast.error { background: var(--danger); }
+
+  @media (max-width: 960px) {
+    .grid { grid-template-columns: 1fr; }
+    .side { position: static; }
+    main { padding: 16px 14px 48px; }
+    .topbar-inner { padding: 12px 14px; }
+    .brand-text p { display: none; }
+  }
+  @media (max-width: 520px) { .two { grid-template-columns: 1fr; } .section { padding: 18px 16px; } }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="logo" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-12.2 7.5L3 20.5l1.6-5.4A8.5 8.5 0 1 1 21 11.5z"/><path d="M8.5 11.5h7M13 8.5l3 3-3 3"/></svg>
+    </div>
+    <div class="brand-text">
+      <h1>Bulk Sender</h1>
+      <p>Send one message, with files if you like, to many WhatsApp numbers</p>
+    </div>
+    <div class="spacer"></div>
+    <div id="pill" class="status wait" role="status"><span class="dot"></span><span id="pillText">Starting</span></div>
+  </div>
+</header>
+
+<main>
+  <section id="banner" class="banner" aria-live="polite"></section>
+
+  <div class="grid">
+    <!-- ================= Compose ================= -->
+    <div class="panel">
+      <fieldset id="composeFs">
+        <div class="section">
+          <div class="section-head">
+            <h2><label for="message">Message</label></h2>
+            <span class="hint" id="charCount">0 characters</span>
+          </div>
+          <textarea id="message" placeholder="Write your message. If you attach a photo or file, this text becomes its caption.&#10;&#10;Tip: *bold*, _italic_ and ~strikethrough~ work like in WhatsApp."></textarea>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <h2>Attachments</h2>
+            <span class="hint">Optional, up to 10 files, 64 MB each</span>
+          </div>
+          <label class="drop" id="drop">
+            <input id="files" type="file" multiple>
+            <span class="drop-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.4 11.1l-9.2 9.2a5.5 5.5 0 0 1-7.8-7.8l9.2-9.2a3.7 3.7 0 0 1 5.2 5.2l-9.2 9.2a1.8 1.8 0 0 1-2.6-2.6l8.5-8.5"/></svg>
+            </span>
+            <span><strong>Choose files or drop them here</strong><span>Photos, videos, PDFs, Word, Excel, anything</span></span>
+          </label>
+          <ul id="fileList" class="files"></ul>
+          <label class="check" id="asDocRow" style="display:none">
+            <input id="asDoc" type="checkbox">
+            <div><b>Send photos and videos as documents</b><span>Keeps the original quality, but they won't show as a preview in the chat.</span></div>
+          </label>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <h2><label for="numbers">Recipients</label></h2>
+            <span class="hint">One per line, with country code</span>
+          </div>
+          <textarea id="numbers" placeholder="919876543210&#10;919876543211"></textarea>
+          <div class="tally" id="tally"></div>
+        </div>
+
+        <div class="section">
+          <details>
+            <summary>Sending options
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </summary>
+            <div class="opts">
+              <div class="two">
+                <div class="field"><label for="minD">Shortest wait between people (seconds)</label><input id="minD" type="number" value="5" min="1"></div>
+                <div class="field"><label for="maxD">Longest wait (seconds)</label><input id="maxD" type="number" value="10" min="1"></div>
+              </div>
+              <label class="check"><input id="skipDone" type="checkbox"><div><b>Skip people who already got it</b><span>Use this to continue an interrupted run.</span></div></label>
+              <label class="check"><input id="dry" type="checkbox"><div><b>Practice run</b><span>Goes through the list without sending anything.</span></div></label>
+            </div>
+          </details>
+        </div>
+      </fieldset>
+    </div>
+
+    <!-- ================= Side ================= -->
+    <aside class="side">
+      <div class="panel">
+        <div class="preview-head">
+          <div class="avatar">A</div>
+          <div><b>Preview</b><small>How each person will see it</small></div>
+        </div>
+        <div class="wall" id="wall"></div>
+      </div>
+
+      <div class="panel">
+        <div class="send-body">
+          <div class="btn-row">
+            <button id="sendBtn" class="btn primary" disabled>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2.5 20.5l19-8.5-19-8.5v6.6l13 1.9-13 1.9z"/></svg>
+              <span id="sendLabel">Send</span>
+            </button>
+            <button id="stopBtn" class="btn ghost" disabled>Stop</button>
+          </div>
+          <div class="eta" id="eta"></div>
+
+          <div class="progress">
+            <div class="bar"><div id="bar"></div></div>
+            <div class="stats">
+              <div class="stat ok"><b id="sSent">0</b><small>Sent</small></div>
+              <div class="stat fail"><b id="sFail">0</b><small>Failed</small></div>
+              <div class="stat"><b id="sSkip">0</b><small>Skipped</small></div>
+              <div class="stat"><b id="sLeft">0</b><small>Left</small></div>
+            </div>
+          </div>
+        </div>
+        <div class="log-wrap">
+          <div class="log-title"><span>Activity</span></div>
+          <div id="log"><div class="empty">Nothing yet. Progress will show here.</div></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</main>
+
+<dialog id="confirm">
+  <div class="dlg">
+    <h3>Send this message?</h3>
+    <p>Check the details before you start. You can stop at any time.</p>
+    <dl>
+      <dt>Recipients</dt><dd id="cNum"></dd>
+      <dt>Attachments</dt><dd id="cFiles"></dd>
+      <dt>Estimated time</dt><dd id="cTime"></dd>
+    </dl>
+    <div class="btn-row">
+      <button class="btn plain" id="cNo" type="button">Cancel</button>
+      <button class="btn primary" id="cYes" type="button">Send now</button>
+    </div>
+  </div>
+</dialog>
+<div id="toast" role="alert"></div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var selected = [];
+  var numbersLoaded = false;
+  var lastJobRunning = false;
+  var wa = { status: 'starting' }, job = { running: false, total: 0, sent: 0, failed: 0, skipped: 0, log: [] };
+  var previewUrls = [];
+
+  /* ---------- helpers ---------- */
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function fmtSize(b) { if (b < 1024) return b + ' B'; if (b < 1048576) return Math.round(b / 1024) + ' KB'; return (b / 1048576).toFixed(1) + ' MB'; }
+  function extOf(name) { var m = /\.([a-z0-9]+)$/i.exec(name); return m ? m[1].slice(0, 4).toUpperCase() : 'FILE'; }
+  function isImage(f) { return /^image\//.test(f.type); }
+  function fmtTime(sec) {
+    sec = Math.max(0, Math.round(sec));
+    if (sec < 60) return 'under a minute';
+    var m = Math.round(sec / 60);
+    if (m < 60) return 'about ' + m + ' min';
+    var h = Math.floor(m / 60), r = m % 60;
+    return 'about ' + h + ' h' + (r ? ' ' + r + ' min' : '');
+  }
+  var toastTimer;
+  function toast(msg, type) {
+    var t = $('toast'); t.textContent = msg; t.className = 'show' + (type === 'error' ? ' error' : '');
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.className = ''; }, 4200);
+  }
+
+  function parseNumbers(text) {
+    var seen = {}, valid = 0, invalid = 0, dup = 0;
+    String(text || '').split(/[\s,;]+/).filter(Boolean).forEach(function (raw) {
+      var n = raw.replace(/\D/g, '');
+      if (!n) { invalid++; return; }
+      if (n.length === 10) n = '91' + n;
+      if (n.length < 8 || n.length > 15) { invalid++; return; }
+      if (seen[n]) { dup++; return; }
+      seen[n] = 1; valid++;
+    });
+    return { valid: valid, invalid: invalid, dup: dup };
+  }
+
+  function estimateSeconds(count) {
+    var min = parseFloat($('minD').value) || 5;
+    var max = Math.max(min, parseFloat($('maxD').value) || 10);
+    var perPerson = (min + max) / 2 + 2;
+    return count * perPerson + Math.floor(count / 25) * 67;
+  }
+
+  /* ---------- message formatting (WhatsApp style) ---------- */
+  function formatMsg(text) {
+    var s = esc(text);
+    s = s.replace(/\*([^*\n]+)\*/g, '<b>$1</b>').replace(/_([^_\n]+)_/g, '<i>$1</i>').replace(/~([^~\n]+)~/g, '<s>$1</s>');
+    return s;
+  }
+
+  /* ---------- preview ---------- */
+  function renderPreview() {
+    previewUrls.forEach(function (u) { URL.revokeObjectURL(u); }); previewUrls = [];
+    var msg = $('message').value.trim();
+    var asDoc = $('asDoc').checked;
+    var html = '';
+    if (!msg && selected.length === 0) {
+      $('wall').innerHTML = '<div class="placeholder">Your message will appear here as you type.</div>';
+      return;
+    }
+    html += '<div class="bubble">';
+    if (selected.length) {
+      var first = selected[0];
+      if (isImage(first) && !asDoc) {
+        var u = URL.createObjectURL(first); previewUrls.push(u);
+        html += '<img class="shot" alt="" src="' + u + '">';
+      } else {
+        html += '<div class="doc"><span class="ext">' + esc(extOf(first.name)) + '</span><div><b>' + esc(first.name) + '</b><small>' + fmtSize(first.size) + '</small></div></div>';
+      }
+      if (selected.length > 1) html += '<div class="more">+ ' + (selected.length - 1) + ' more file' + (selected.length > 2 ? 's' : '') + ' sent right after</div>';
+    }
+    if (msg) html += '<div class="txt">' + formatMsg(msg) + '</div>';
+    var now = new Date();
+    var hh = now.getHours() % 12 || 12, mm = ('0' + now.getMinutes()).slice(-2);
+    html += '<div class="meta">' + hh + ':' + mm + ' ' + (now.getHours() >= 12 ? 'pm' : 'am') +
+      ' <svg width="16" height="11" viewBox="0 0 16 11" fill="none" stroke="#53bdeb" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M1 6l3 3 6-7M6 9l1 .9 6-7.4"/></svg></div></div>';
+    $('wall').innerHTML = html;
+  }
+
+  /* ---------- files ---------- */
+  function addFiles(list) {
+    var arr = Array.prototype.slice.call(list);
+    for (var i = 0; i < arr.length; i++) {
+      if (selected.length >= 10) { toast('You can attach up to 10 files.', 'error'); break; }
+      if (arr[i].size > 64 * 1024 * 1024) { toast(arr[i].name + ' is larger than 64 MB.', 'error'); continue; }
+      selected.push(arr[i]);
+    }
+    $('files').value = '';
+    renderFiles();
+  }
+  function renderFiles() {
+    var ul = $('fileList'); ul.innerHTML = '';
+    selected.forEach(function (f, i) {
+      var li = document.createElement('li'); li.className = 'file';
+      var thumb = '<span class="ext">' + esc(extOf(f.name)) + '</span>';
+      li.innerHTML = thumb + '<div class="file-name"><b>' + esc(f.name) + '</b><small>' + fmtSize(f.size) + '</small></div>' +
+        '<button type="button" class="icon-btn" aria-label="Remove ' + esc(f.name) + '"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>';
+      li.querySelector('button').onclick = function () { selected.splice(i, 1); renderFiles(); };
+      ul.appendChild(li);
+      if (isImage(f)) {
+        var u = URL.createObjectURL(f);
+        var ext = li.querySelector('.ext'); ext.innerHTML = '<img alt="" src="' + u + '">';
+        ext.querySelector('img').onload = function () { URL.revokeObjectURL(u); };
+      }
+    });
+    var hasMedia = selected.some(function (f) { return /^(image|video)\//.test(f.type); });
+    $('asDocRow').style.display = hasMedia ? 'flex' : 'none';
+    if (!hasMedia) $('asDoc').checked = false;
+    renderPreview(); updateSendUI();
+  }
+  $('files').addEventListener('change', function (e) { addFiles(e.target.files); });
+  var drop = $('drop');
+  ['dragenter', 'dragover'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
+  ['dragleave', 'drop'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
+  drop.addEventListener('drop', function (e) { if (e.dataTransfer && e.dataTransfer.files) addFiles(e.dataTransfer.files); });
+
+  /* ---------- live fields ---------- */
+  function updateCounts() {
+    var len = $('message').value.length;
+    $('charCount').textContent = len + (len === 1 ? ' character' : ' characters');
+    var p = parseNumbers($('numbers').value);
+    var chips = '<span class="chip">' + p.valid + ' valid number' + (p.valid === 1 ? '' : 's') + '</span>';
+    if (p.invalid) chips += '<span class="chip warn">' + p.invalid + ' invalid, will be skipped</span>';
+    if (p.dup) chips += '<span class="chip warn">' + p.dup + ' duplicate' + (p.dup === 1 ? '' : 's') + ' removed</span>';
+    $('tally').innerHTML = chips;
+    updateSendUI();
+  }
+  function updateSendUI() {
+    var p = parseNumbers($('numbers').value);
+    var label = job.running ? 'Sending...' : (p.valid ? 'Send to ' + p.valid + ' number' + (p.valid === 1 ? '' : 's') : 'Send');
+    $('sendLabel').textContent = label;
+    $('sendBtn').disabled = wa.status !== 'ready' || job.running || p.valid === 0 || ($('message').value.trim() === '' && selected.length === 0);
+    if (!job.running) $('eta').textContent = p.valid ? 'Estimated time: ' + fmtTime(estimateSeconds(p.valid)) + '.' : '';
+  }
+  ['input', 'change'].forEach(function (ev) {
+    $('message').addEventListener(ev, function () { renderPreview(); updateCounts(); });
+    $('numbers').addEventListener(ev, updateCounts);
+    $('minD').addEventListener(ev, updateSendUI);
+    $('maxD').addEventListener(ev, updateSendUI);
+  });
+  $('asDoc').addEventListener('change', renderPreview);
+
+  /* ---------- send ---------- */
+  function startSend() {
+    var fd = new FormData();
+    fd.append('message', $('message').value.trim());
+    fd.append('numbers', $('numbers').value);
+    fd.append('minDelay', $('minD').value);
+    fd.append('maxDelay', $('maxD').value);
+    fd.append('asDocument', $('asDoc').checked);
+    fd.append('skipDone', $('skipDone').checked);
+    fd.append('dryRun', $('dry').checked);
+    selected.forEach(function (f) { fd.append('files', f); });
+    $('sendBtn').disabled = true;
+    fetch('/send', { method: 'POST', body: fd })
+      .then(function (r) { return r.json(); })
+      .then(function (j) { if (j.error) toast(j.error, 'error'); poll(); })
+      .catch(function () { toast('Could not reach the app. Is it still running?', 'error'); });
+  }
+  $('sendBtn').onclick = function () {
+    var p = parseNumbers($('numbers').value);
+    if ($('dry').checked) { startSend(); return; }
+    $('cNum').textContent = p.valid;
+    $('cFiles').textContent = selected.length ? selected.length + (selected.length === 1 ? ' file' : ' files') : 'None';
+    $('cTime').textContent = fmtTime(estimateSeconds(p.valid));
+    $('confirm').showModal();
+  };
+  $('cNo').onclick = function () { $('confirm').close(); };
+  $('cYes').onclick = function () { $('confirm').close(); startSend(); };
+  $('stopBtn').onclick = function () { fetch('/stop', { method: 'POST' }); toast('Stopping after the current person...'); };
+
+  /* ---------- status polling ---------- */
+  function renderBanner() {
+    var b = $('banner'), s = wa.status;
+    b.className = 'banner';
+    if (s === 'ready') { b.innerHTML = ''; return; }
+    b.classList.add('show');
+    if (s === 'qr' && wa.qr) {
+      b.innerHTML = '<div class="link-row"><div class="qr-box"><img alt="WhatsApp QR code" src="' + wa.qr + '"></div>' +
+        '<div><h2>Link your WhatsApp</h2><p>Scan this code once to connect. Messages are sent from your own number.</p>' +
+        '<ol class="steps"><li>Open WhatsApp on your phone</li><li>Tap Linked devices, then Link a device</li><li>Point the camera at this code</li></ol></div></div>';
+    } else if (s === 'disconnected' || s === 'error') {
+      b.classList.add('err');
+      b.innerHTML = '<h2>WhatsApp is not connected</h2><p>' + esc(wa.error || 'The connection was lost.') + ' Close the app, run npm start again and scan the code.</p>';
+    } else {
+      b.innerHTML = '<h2><span class="spin"></span>Connecting to WhatsApp</h2><p>This can take up to a minute the first time.</p>';
+    }
+  }
+  function renderLog() {
+    var el = $('log');
+    if (!job.log.length) { el.innerHTML = '<div class="empty">Nothing yet. Progress will show here.</div>'; return; }
+    var atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 24;
+    el.innerHTML = job.log.map(function (l) {
+      var cls = /FAILED|not on WhatsApp|Fatal/.test(l) ? 'bad' : (/ sent \(|Done\./.test(l) ? 'ok' : (/skipped|dry|Resting|Stopped|Starting/.test(l) ? 'dim' : ''));
+      return '<div class="' + cls + '">' + esc(l) + '</div>';
+    }).join('');
+    if (atBottom) el.scrollTop = el.scrollHeight;
+  }
+  function poll() {
+    fetch('/status').then(function (r) { return r.json(); }).then(function (s) {
+      wa = s.wa; job = s.job;
+      var pill = $('pill'), txt = $('pillText');
+      if (wa.status === 'ready') { pill.className = 'status ready'; txt.textContent = 'Connected'; }
+      else if (wa.status === 'disconnected' || wa.status === 'error') { pill.className = 'status bad'; txt.textContent = 'Disconnected'; }
+      else if (wa.status === 'qr') { pill.className = 'status wait'; txt.textContent = 'Waiting for scan'; }
+      else { pill.className = 'status wait'; txt.textContent = 'Connecting'; }
+      renderBanner();
+
+      if (!numbersLoaded && s.numbersText) { $('numbers').value = s.numbersText; numbersLoaded = true; updateCounts(); }
+
+      $('composeFs').disabled = !!job.running;
+      $('stopBtn').disabled = !job.running;
+      var done = job.sent + job.failed + job.skipped, left = Math.max(0, job.total - done);
+      $('sSent').textContent = job.sent; $('sFail').textContent = job.failed; $('sSkip').textContent = job.skipped; $('sLeft').textContent = left;
+      $('bar').style.width = (job.total ? Math.min(100, done / job.total * 100) : 0) + '%';
+      if (job.running) $('eta').textContent = left + ' left, ' + fmtTime(estimateSeconds(left)) + ' to go.';
+      else if (lastJobRunning && job.total) { $('eta').textContent = 'Finished. See the activity log below.'; }
+      if (lastJobRunning && !job.running) toast('Finished: ' + job.sent + ' sent, ' + job.failed + ' failed.');
+      lastJobRunning = job.running;
+      renderLog(); updateSendUI();
+      if (job.running) $('eta').textContent = left + ' left, ' + fmtTime(estimateSeconds(left)) + ' to go.';
+    }).catch(function () {
+      $('pill').className = 'status bad'; $('pillText').textContent = 'App not reachable';
+    });
+  }
+
+  renderPreview(); updateCounts();
+  setInterval(poll, 1500); poll();
+})();
+</script>
+</body>
+</html>

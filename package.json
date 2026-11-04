@@ -1,0 +1,17 @@
+{
+  "name": "bulk-sender",
+  "version": "1.0.0",
+  "description": "Send a text message with photo/document/video attachments to many WhatsApp numbers from a simple local web page.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "postinstall": "node patch-wwebjs.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2",
+    "multer": "^1.4.5-lts.1",
+    "qrcode": "^1.5.4",
+    "whatsapp-web.js": "latest"
+  }
+}
